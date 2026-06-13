@@ -36,6 +36,15 @@ function sanitise(raw: string): string {
   return raw.toUpperCase().replace(/[^ATGCN]/g, '')
 }
 
+// Maps GC% (0–100) to a hue: 0%→240° (blue), 100%→360°/0° (red), via 300° (magenta)
+function gcHue(gc: number, shift: number): number {
+  return (240 + (gc / 100) * 120 + shift) % 360
+}
+
+function gcColor(gc: number, shift: number, opacity = 1): string {
+  return `hsla(${gcHue(gc, shift).toFixed(0)}, 90%, 60%, ${opacity})`
+}
+
 interface Statistics {
   total_length: number
   gc_count: number
@@ -84,12 +93,15 @@ function StatTile({
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function CustomTooltip({ active, payload, label }: any) {
+function CustomTooltip({ active, payload, label, colorShift: shift = 0 }: any) {
   if (!active || !payload?.length) return null
+  const gc: number = payload[0].value
   return (
     <div className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm font-mono">
       <div className="text-slate-400">Position {label}</div>
-      <div className="text-[#00D4FF] font-bold">{payload[0].value.toFixed(1)}% GC</div>
+      <div className="font-bold" style={{ color: gcColor(gc, shift) }}>
+        {gc.toFixed(1)}% GC
+      </div>
     </div>
   )
 }
@@ -100,6 +112,7 @@ export default function Home() {
   const [rawInput, setRawInput] = useState('')
   const [sequence, setSequence] = useState('')
   const [windowSize, setWindowSize] = useState(20)
+  const [colorShift, setColorShift] = useState(0)
   const [chartData, setChartData] = useState<ChartPoint[]>([])
   const [statistics, setStatistics] = useState<Statistics | null>(null)
   const [hasResults, setHasResults] = useState(false)
@@ -196,6 +209,18 @@ export default function Home() {
   const overLimit = validCount > MAX_BASES
   const canAnalyse = ready && validCount >= windowSize && !overLimit
 
+  // Gradient stops: top of chart (offset 0%) = 100% GC = red; bottom (offset 100%) = 0% GC = blue
+  const gcStops = [100, 75, 50, 25, 0].map((gc) => ({
+    gc,
+    offset: `${100 - gc}%`,
+    hsl: `hsl(${gcHue(gc, colorShift).toFixed(0)}, 90%, 60%)`,
+  }))
+
+  // Legend colors: left=low GC (blue), right=high GC (red)
+  const legendGradient = `linear-gradient(to right, ${[0, 25, 50, 75, 100]
+    .map((gc) => `hsl(${gcHue(gc, colorShift).toFixed(0)}, 90%, 60%)`)
+    .join(', ')})`
+
   return (
     <main className="min-h-screen bg-[#0F1117] px-4 py-8 md:px-8">
       {!ready && !error && (
@@ -255,6 +280,7 @@ export default function Home() {
             bases
           </label>
           <input
+            id="window-range"
             type="range"
             min={10}
             max={50}
@@ -291,16 +317,54 @@ export default function Home() {
           style={{ opacity: resultsVisible ? 1 : 0 }}
         >
           <section className="rounded-xl border border-slate-700/50 bg-slate-900/60 p-6 card-glow transition-shadow duration-300">
-            <h2 className="mb-4 font-mono text-sm font-bold text-slate-300 uppercase tracking-widest">
-              Sliding Window GC Content (window ={' '}
-              <span className="text-[#00D4FF]">{windowSize}</span> bases)
-            </h2>
+            <div className="flex flex-wrap items-center justify-between gap-4 mb-3">
+              <h2 className="font-mono text-sm font-bold text-slate-300 uppercase tracking-widest">
+                Sliding Window GC Content (window ={' '}
+                <span className="text-[#00D4FF]">{windowSize}</span> bases)
+              </h2>
+              <div className="flex items-center gap-3">
+                <span className="text-xs font-mono text-slate-500 uppercase tracking-widest whitespace-nowrap">
+                  Colour shift
+                </span>
+                <input
+                  type="range"
+                  min={0}
+                  max={359}
+                  value={colorShift}
+                  onChange={(e) => setColorShift(Number(e.target.value))}
+                  className="color-shift-range w-28"
+                />
+                <span
+                  className="text-xs font-mono w-8 tabular-nums"
+                  style={{ color: gcColor(75, colorShift) }}
+                >
+                  {colorShift}°
+                </span>
+              </div>
+            </div>
+
+            {/* Color scale legend */}
+            <div className="flex items-center gap-2 mb-4">
+              <span className="text-xs font-mono text-slate-500 whitespace-nowrap">Low GC</span>
+              <div
+                className="flex-1 h-2 rounded-full"
+                style={{ background: legendGradient }}
+              />
+              <span className="text-xs font-mono text-slate-500 whitespace-nowrap">High GC</span>
+            </div>
+
             <ResponsiveContainer width="100%" height={320}>
               <AreaChart data={chartData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
                 <defs>
-                  <linearGradient id="gcGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#00D4FF" stopOpacity={0.35} />
-                    <stop offset="95%" stopColor="#39FF14" stopOpacity={0.05} />
+                  <linearGradient id="gcStroke" x1="0" y1="0" x2="0" y2="1">
+                    {gcStops.map(({ gc, offset, hsl }) => (
+                      <stop key={gc} offset={offset} stopColor={hsl} />
+                    ))}
+                  </linearGradient>
+                  <linearGradient id="gcFill" x1="0" y1="0" x2="0" y2="1">
+                    {gcStops.map(({ gc, offset, hsl }) => (
+                      <stop key={gc} offset={offset} stopColor={hsl} stopOpacity={gc / 100 * 0.4} />
+                    ))}
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
@@ -314,16 +378,16 @@ export default function Home() {
                   tick={{ fill: '#64748b', fontSize: 11, fontFamily: 'monospace' }}
                   tickFormatter={(v: number) => `${v}%`}
                 />
-                <Tooltip content={<CustomTooltip />} />
+                <Tooltip content={<CustomTooltip colorShift={colorShift} />} />
                 <ReferenceLine y={50} stroke="#ef4444" strokeDasharray="4 4" strokeOpacity={0.6} />
                 <Area
                   type="monotone"
                   dataKey="gc"
-                  stroke="#00D4FF"
-                  strokeWidth={2}
-                  fill="url(#gcGradient)"
+                  stroke="url(#gcStroke)"
+                  strokeWidth={2.5}
+                  fill="url(#gcFill)"
                   dot={false}
-                  activeDot={{ r: 4, fill: '#00D4FF', stroke: '#0F1117', strokeWidth: 2 }}
+                  activeDot={{ r: 4, fill: gcColor(50, colorShift), stroke: '#0F1117', strokeWidth: 2 }}
                 />
               </AreaChart>
             </ResponsiveContainer>
