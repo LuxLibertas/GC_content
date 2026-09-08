@@ -477,6 +477,15 @@ export default function Home() {
           </p>
         </section>
       )}
+
+      <footer className="mt-12 border-t border-slate-800/60 pt-6">
+        <p className="max-w-3xl font-mono text-xs leading-relaxed text-slate-600">
+          <strong className="text-slate-500">Educational &amp; experimental use only.</strong>{' '}
+          The tools are provided &ldquo;as is&rdquo;, without warranty. Outputs should be
+          independently verified and should not be relied upon as a substitute for professional
+          judgement. You use the tools at your own discretion and risk.
+        </p>
+      </footer>
     </main>
   )
 }
