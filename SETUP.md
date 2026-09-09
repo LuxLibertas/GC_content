@@ -4,7 +4,7 @@
 
 | Tool | Install |
 |------|---------|
-| Node.js 18+ | https://nodejs.org |
+| Node.js 20.9+ | https://nodejs.org |
 | Rust toolchain | `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \| sh` |
 | wasm-pack | `cargo install wasm-pack` |
 

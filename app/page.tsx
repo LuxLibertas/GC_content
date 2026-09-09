@@ -92,10 +92,19 @@ function StatTile({
   )
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function CustomTooltip({ active, payload, label, colorShift: shift = 0 }: any) {
+function CustomTooltip({
+  active,
+  payload,
+  label,
+  colorShift: shift = 0,
+}: {
+  active?: boolean
+  payload?: { value: number }[]
+  label?: string | number
+  colorShift?: number
+}) {
   if (!active || !payload?.length) return null
-  const gc: number = payload[0].value
+  const gc = payload[0].value
   return (
     <div className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm font-mono">
       <div className="text-slate-400">Position {label}</div>
@@ -120,8 +129,11 @@ export default function Home() {
   const [resultsVisible, setResultsVisible] = useState(false)
 
   useEffect(() => {
+    // Client-only mount read: localStorage is unavailable during SSR, so this
+    // can't move into useState initialisation without a hydration mismatch.
     try {
       const raw = localStorage.getItem('gc_scope_saved')
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       if (raw) setSavedSession(JSON.parse(raw) as SavedSession)
     } catch {}
   }, [])

@@ -1,4 +1,6 @@
-declare module '/wasm/gc_wasm.js' {
+// Wildcard match: the hook imports this at runtime as '/wasm/gc_wasm.js'
+// (served from public/wasm/), which TS can't resolve on disk.
+declare module '*/gc_wasm.js' {
   export function calculate_gc_windows(sequence: string, window_size: number): Float64Array
   export function calculate_statistics(sequence: string): {
     total_length: number
